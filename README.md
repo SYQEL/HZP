@@ -1,5 +1,4 @@
-# HZP
-Solfeggio Frequencies Music Streaming &amp; MP3 Player
+# HZP - Solfeggio Frequencies Music Streaming & MP3 Player
 
 For the first time the Solfeggio Frequencies are at your fingertips with HZP. HZP is an ad-free music player that includes real time, lossless song conversion from 440Hz to any of the healing Solfeggio output frequencies such as 432Hz, 528Hz, 639Hz and more. It’s your music, made mindful!
 
