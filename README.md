@@ -22,7 +22,8 @@ Available output frequencies include:
 HZP allows you to unlock the healing potential of the Solfeggio Frequencies at home from any device – making ancient medicine accessible for modern times. This new software is perfect for casual and easy listening, meditations, yoga classes, and mindful gatherings of all kinds. Elevate your listening experience with HZP. You’ll love what you hear!
 
 # Available Platforms:
-- Windows
-- Android
-- iOS
-- macOS & iPadOS (Apple Silicone)
+- Web >> https://app.hzp.co
+- Windows >> https://hzp.co/windows
+- Android >> https://hzp.co/android
+- iOS >> https://hzp.co/ios
+- macOS & iPadOS (Apple Silicone)  >> https://hzp.co/mac
