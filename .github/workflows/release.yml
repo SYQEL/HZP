@@ -1,0 +1,87 @@
+# HZP Desktop — release workflow for this PUBLIC repo (github.com/SYQEL/HZP).
+# Tag this repo (e.g. `git tag v0.8.0 && git push --tags`) and it builds the macOS + Windows
+# STANDALONE desktop apps from the private GitLab source (gitlab.com/syqel/hzp-web-next), OS-signs
+# them (Apple Developer ID / Azure Trusted Signing), updater-signs them, and publishes the
+# installers + latest.json to a GitHub Release. The installed apps' self-updater polls
+# releases/latest/download/latest.json on this repo.
+#
+# The Mac App Store and Microsoft Store flavors are NOT built here — those are built from the
+# source repo with scripts/build-appstore.sh (macOS) and scripts/build-msstore.ps1 (Windows).
+#
+# Secrets needed (mirrors SYQEL/SYQEL-Art-Releases): GITLAB_TOKEN (read_repository on the source),
+# TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD if the key is encrypted; HZP's is not), and for OS
+# signing: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID,
+# APPLE_PASSWORD, APPLE_TEAM_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET.
+# Apple/Azure secrets may be omitted for a first unsigned test build.
+
+name: release-desktop
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    permissions:
+      contents: write # publish the GitHub Release on this repo
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      # 1. Pull the private source from GitLab into ./source (read-only token; never stored here).
+      - name: Clone private source
+        run: git clone --depth 1 --branch main "https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/syqel/hzp-web-next.git" source
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install deps
+        run: npm ci
+        working-directory: source
+
+      # Windows code-signing via Azure Trusted Signing — the CLI tauri.conf's signCommand calls.
+      - name: Install trusted-signing-cli (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: cargo install trusted-signing-cli
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          # auto-provided by Actions; tauri-action needs it to create + upload the GitHub Release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # layer 2 — updater artifact signature (key generated 2026-07-07, no password)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # layer 1 (macOS) — Apple cert + notarization (omit for a first unsigned test build)
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # layer 1 (Windows) — Azure Trusted Signing
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        with:
+          projectPath: source
+          tagName: ${{ github.ref_name }}
+          releaseName: 'HZP ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true # generates latest.json for the updater endpoint
+          args: ${{ matrix.args }}
+
+# NOTE: bump the app version in the source repo (package.json + src-tauri/tauri.conf.json +
+# src-tauri/Cargo.toml) to match each tag — the updater compares the installed version against
+# latest.json's version.
